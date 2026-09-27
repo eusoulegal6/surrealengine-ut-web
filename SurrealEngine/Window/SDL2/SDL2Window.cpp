@@ -363,12 +363,18 @@ void SDL2Window::ShowCursor(bool enable)
 
 void SDL2Window::LockCursor()
 {
+#ifdef __EMSCRIPTEN__
+    return; // Browser controls own pointer lock and menu transitions.
+#endif
     SDL_SetWindowGrab(m_SDLWindow, SDL_TRUE);
     SDL_SetRelativeMouseMode(SDL_TRUE);
 }
 
 void SDL2Window::UnlockCursor()
 {
+#ifdef __EMSCRIPTEN__
+    return; // Browser controls own pointer lock and menu transitions.
+#endif
     SDL_SetWindowGrab(m_SDLWindow, SDL_FALSE);
     SDL_SetRelativeMouseMode(SDL_FALSE);
 }

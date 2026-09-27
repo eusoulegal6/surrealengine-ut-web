@@ -19,6 +19,7 @@ namespace fs = std::filesystem;
 #include <emscripten.h>
 #include "UObject/UClient.h"
 #include "UObject/UActor.h"
+#include "UObject/ULevel.h"
 Engine *EMSCRIPTEN_GLOBAL_GAME_ENGINE = nullptr;
 // Browser controls enter the same original key/axis binding system as SDL.
 extern "C" {
@@ -30,6 +31,17 @@ EMSCRIPTEN_KEEPALIVE void web_key(int key, int down) {
 }
 EMSCRIPTEN_KEEPALIVE void web_look(int dx, int dy) {
     if (EMSCRIPTEN_GLOBAL_GAME_ENGINE) EMSCRIPTEN_GLOBAL_GAME_ENGINE->OnWindowRawMouseMove(dx,dy);
+}
+// Menu coordinates are framebuffer pixels, after browser letterbox/DPI mapping.
+EMSCRIPTEN_KEEPALIVE void web_cursor(int x, int y) {
+    auto* e = EMSCRIPTEN_GLOBAL_GAME_ENGINE;
+    if (!e || !e->viewport) return;
+    e->viewport->WindowsMouseX() = static_cast<float>(x);
+    e->viewport->WindowsMouseY() = static_cast<float>(y);
+}
+EMSCRIPTEN_KEEPALIVE int web_menu() {
+    auto* e = EMSCRIPTEN_GLOBAL_GAME_ENGINE;
+    return e && e->viewport && e->viewport->bShowWindowsMouse();
 }
 EMSCRIPTEN_KEEPALIVE void web_focus(int active) {
     if (!EMSCRIPTEN_GLOBAL_GAME_ENGINE) return;
@@ -44,11 +56,23 @@ void emscripten_game_loop_step() {
         if (++frames % 15 == 0 && EMSCRIPTEN_GLOBAL_GAME_ENGINE->viewport && EMSCRIPTEN_GLOBAL_GAME_ENGINE->viewport->Actor()) {
             auto* player = EMSCRIPTEN_GLOBAL_GAME_ENGINE->viewport->Actor();
             auto p = player->Location(); auto v = player->Velocity(); auto r = player->ViewRotation();
+            std::string bots;
+            for (auto* actor : EMSCRIPTEN_GLOBAL_GAME_ENGINE->Level->Actors) {
+                auto* bot = UObject::TryCast<UPawn>(actor);
+                if (!bot || !bot->IsA("Bot") || bot->bDeleteMe()) continue;
+                auto loc = bot->Location();
+                bots += " | " + (bot->PlayerReplicationInfo() ? bot->PlayerReplicationInfo()->PlayerName() : bot->Name.ToString()) + ": " + bot->GetStateName().ToString()
+                    + " hp=" + std::to_string(bot->Health())
+                    + " hidden=" + std::to_string((bool)bot->bHidden())
+                    + " xyz=" + std::to_string((int)loc.x) + "," + std::to_string((int)loc.y) + "," + std::to_string((int)loc.z);
+            }
             EM_ASM({
+                var botEl=document.getElementById('bot-telemetry');
+                if(botEl)botEl.textContent=UTF8ToString($10);
                 var el=document.getElementById('telemetry');
                 var now=performance.now();var fps=Module.utLastSample?15000/(now-Module.utLastSample):0;Module.utLastSample=now;
                 if(el)el.textContent='Frame '+$0+' | '+fps.toFixed(1)+' fps'+' | position '+Math.round($1)+','+Math.round($2)+','+Math.round($3)+' | velocity '+Math.round($4)+','+Math.round($5)+','+Math.round($6)+' | view '+$7+','+$8+' | health '+$9;
-            }, frames, p.x,p.y,p.z,v.x,v.y,v.z,r.Pitch,r.Yaw,player->Health());
+            }, frames, p.x,p.y,p.z,v.x,v.y,v.z,r.Pitch,r.Yaw,player->Health(),bots.c_str());
         }
     } catch (const std::exception& e) {
         emscripten_cancel_main_loop();

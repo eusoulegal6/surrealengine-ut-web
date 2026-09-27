@@ -2018,13 +2018,13 @@ bool UPawn::CanSee(UActor* other)
 
 	// Calculate the cosine of the vectors
 	// which is basically A dot B / (|A| * |B|), or just the dot products of the normalized versions of A and B
-	float cosine = dot(normalize(orientation), normalize(origin));
+	float cosine = dot(normalize(orientation), normalize(origin - eye_pos));
 	// PeripheralVision field is set dynamically during a game session
 	// (for an example, see the function UnrealShare.Bots.PreSetMovement())
 	// This can be a negative value too, which is probably set to not take it into account
 	float peripheralVision = PeripheralVision();
 
-	if (peripheralVision > 0.0f && abs(cosine) > peripheralVision)
+	if (cosine < peripheralVision)
 		return false;
 
 	return FastTrace(origin, eye_pos) || FastTrace(top, eye_pos) || FastTrace(bottom, eye_pos);
@@ -2268,6 +2268,45 @@ void UPawn::Tick(float elapsed, bool tickedFlag)
 		}
 		if (engine->LaunchInfo.engineVersion >= 436 && bAdvancedTactics())
 			CallEvent(this, EventName::UpdateTactics, { ExpressionValue::FloatValue(elapsed) });
+
+		// Backported from dpjudas/SurrealEngine 597a08d1: notify original AI scripts of sight events.
+		SightCounter() -= elapsed;
+		if (SightCounter() <= 0.0f)
+		{
+			// Spread perception checks across frames, as in the newer upstream engine.
+			SightCounter() += 0.4f - 0.2f * (static_cast <float> (rand()) / static_cast <float> (RAND_MAX));
+
+			//search for target, if the pawn has an event to see them
+			if (IsEventEnabled(EventName::SeePlayer))
+			{
+				//search every pawn in the map, if they are visible fire the related event
+				for (UPawn* other = Level()->PawnList(); other; other = other->nextPawn())
+				{
+					//skip self, dead pawns and the currenty chosen enemy (handeld by the if(Enemy()) branch)
+					if (other == this || other == Enemy() || other->Health() <= 0 || other->bHidden() || other->bDeleteMe())
+						continue;
+					//if the enemy pawn is visible, notify the Unreal scrip about it
+					if (CanSee(other))
+						CallEvent(this, EventName::SeePlayer, { ExpressionValue::ObjectValue(other) });
+				}
+			}
+
+			//if the pawn already has an enemy, update its tracking data
+			if (Enemy())
+			{
+				if (CanSee(Enemy()))
+				{
+					LastSeenPos() = Enemy()->Location();
+					LastSeeingPos() = Location();
+					if (engine->LaunchInfo.engineVersion > 219)
+						LastSeenTime() = Level()->TimeSeconds();
+				}
+				else if (IsEventEnabled(EventName::EnemyNotVisible))
+				{
+					CallEvent(this, EventName::EnemyNotVisible);
+				}
+			}
+		}
 	}
 }
 
