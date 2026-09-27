@@ -264,6 +264,7 @@ set(SURREALCOMMON_SOURCES
 	SurrealEngine/UObject/UMusic.cpp
 	SurrealEngine/UObject/UClient.cpp
 	SurrealEngine/UObject/UActor.cpp
+	SurrealEngine/UObject/UPawnPath.cpp
 	SurrealEngine/UObject/ULevel.h
 	SurrealEngine/UObject/UClass.cpp
 	SurrealEngine/UObject/UTexture.cpp

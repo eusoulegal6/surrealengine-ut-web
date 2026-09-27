@@ -58,7 +58,7 @@ void NPawn::CheckValidSkinPackage(const std::string& SkinPack, const std::string
 
 void NPawn::ClearPaths(UObject* Self)
 {
-	engine->LogUnimplemented("Pawn.ClearPaths");
+	UObject::Cast<UPawn>(Self)->ClearPaths();
 }
 
 void NPawn::ClientHearSound(UObject* Self, UObject* Actor, int Id, UObject* S, const vec3& SoundLocation, const vec3& Parameters)
@@ -68,31 +68,33 @@ void NPawn::ClientHearSound(UObject* Self, UObject* Actor, int Id, UObject* S, c
 
 void NPawn::EAdjustJump(UObject* Self, vec3& ReturnValue)
 {
-	engine->LogUnimplemented("Pawn.EAdjustJump");
+	ReturnValue = UObject::Cast<UPawn>(Self)->EAdjustJump();
 }
 
 void NPawn::FindBestInventoryPath(UObject* Self, float& MinWeight, bool bPredictRespawns, UObject*& ReturnValue)
 {
-	engine->LogUnimplemented("Pawn.FindBestInventoryPath");
-	ReturnValue = nullptr;
+	ReturnValue = UObject::Cast<UPawn>(Self)->FindBestInventoryPath(bPredictRespawns, MinWeight);
 }
 
 void NPawn::FindPathTo(UObject* Self, const vec3& aPoint, BitfieldBool* bSinglePath, BitfieldBool* bClearPaths, UObject*& ReturnValue)
 {
-	engine->LogUnimplemented("Pawn.FindPathTo");
-	ReturnValue = nullptr;
+	auto* self = UObject::Cast<UPawn>(Self);
+	if (!bClearPaths || *bClearPaths) self->ClearPaths();
+	ReturnValue = self->FindPathTo(aPoint, bSinglePath && *bSinglePath);
 }
 
 void NPawn::FindPathToward(UObject* Self, UObject* anActor, BitfieldBool* bSinglePath, BitfieldBool* bClearPaths, UObject*& ReturnValue)
 {
-	engine->LogUnimplemented("Pawn.FindPathToward");
-	ReturnValue = nullptr;
+	auto* self = UObject::Cast<UPawn>(Self);
+	if (!bClearPaths || *bClearPaths) self->ClearPaths();
+	ReturnValue = self->FindPathToward(anActor, bSinglePath && *bSinglePath);
 }
 
 void NPawn::FindRandomDest(UObject* Self, BitfieldBool* bClearPaths, UObject*& ReturnValue)
 {
-	engine->LogUnimplemented("Pawn.FindRandomDest");
-	ReturnValue = nullptr;
+	auto* self = UObject::Cast<UPawn>(Self);
+	if (!bClearPaths || *bClearPaths) self->ClearPaths();
+	ReturnValue = self->FindRandomDest();
 }
 
 void NPawn::FindStairRotation(UObject* Self, float DeltaTime, int& ReturnValue)

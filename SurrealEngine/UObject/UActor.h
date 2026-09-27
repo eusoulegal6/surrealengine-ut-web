@@ -1415,6 +1415,21 @@ public:
 	bool ActorReachable(UActor* anActor);
 	bool PointReachable(vec3 aPoint);
 
+	// Native prerequisites used by the original Botpack AI.
+	vec3 EAdjustJump();
+	bool IsInPathSpecialHandling = false;
+	UNavigationPoint* SetRouteCache(const std::vector<UNavigationPoint*>& points);
+	UActor* PathSpecialHandling(const std::vector<UNavigationPoint*>& bestPath);
+	std::pair<std::vector<UNavigationPoint*>, int32_t> FindPathToEndPoint(UNavigationPoint* start, int maxNodes);
+	void ClearPaths();
+	UObject* FindRandomDest();
+	UObject* FindPathTo(const vec3& point, bool singlePath);
+	bool MarkReachableNavEndPoints();
+	UObject* FindPathToward(UObject* actor, bool singlePath);
+	UNavigationPoint* FindClosestNavPoint(vec3 location);
+	UObject* FindBestInventoryPath(bool predictRespawns, float& bestWeight);
+
+
 	UActor* PickAnyTarget(float& bestAim, float& bestDist, const vec3& FireDir, const vec3& projStart);
 	UActor* PickTarget(float& bestAim, float& bestDist, const vec3& FireDir, const vec3& projStart);
 	bool CheckIfBestTarget(UActor* actor, float& bestAim, float& bestDist, const vec3& FireDir, const vec3& projStart);

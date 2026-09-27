@@ -8,6 +8,7 @@
 class UTexture;
 class UActor;
 class UPawn;
+class UNavigationPoint;
 class UBrush;
 class UDecal;
 class UZoneInfo;
@@ -203,8 +204,8 @@ class LevelReachSpec
 {
 public:
 	int32_t distance;
-	int32_t startActor;
-	int32_t endActor;
+	UNavigationPoint* startActor;
+	UNavigationPoint* endActor;
 	int32_t collisionRadius;
 	int32_t collisionHeight;
 	int32_t reachFlags;

@@ -27,6 +27,7 @@ void RenderSubsystem::DrawMesh(FSceneNode* frame, UActor* actor, bool wireframe)
 void RenderSubsystem::DrawMesh(FSceneNode* frame, UActor* actor, UMesh* mesh, const mat4& ObjectToWorld, const mat3& ObjectNormalToWorld)
 {
 	MeshAnimSeq* seq = mesh->GetSequence(actor->AnimSequence());
+	if (!seq || seq->NumFrames <= 0) return;
 	float animFrame = actor->AnimFrame() * seq->NumFrames;
 
 	int vertexOffsets[3];
@@ -140,6 +141,7 @@ void RenderSubsystem::DrawMesh(FSceneNode* frame, UActor* actor, UMesh* mesh, co
 void RenderSubsystem::DrawLodMesh(FSceneNode* frame, UActor* actor, ULodMesh* mesh, const mat4& ObjectToWorld, const mat3& ObjectNormalToWorld)
 {
 	MeshAnimSeq* seq = mesh->GetSequence(actor->AnimSequence());
+	if (!seq || seq->NumFrames <= 0) return;
 	float animFrame = actor->AnimFrame() * seq->NumFrames;
 
 	int vertexOffsets[3];
@@ -168,7 +170,43 @@ void RenderSubsystem::DrawLodMesh(FSceneNode* frame, UActor* actor, ULodMesh* me
 
 	SetupLodMeshTextures(actor, mesh);
 	DrawLodMeshFace(frame, actor, mesh, mesh->Faces, ObjectToWorld, ObjectNormalToWorld, mesh->SpecialVerts, vertexOffsets, t0, t1);
-	DrawLodMeshFace(frame, actor, mesh, mesh->SpecialFaces, ObjectToWorld, ObjectNormalToWorld, 0, vertexOffsets, t0, t1);
+	// SpecialFaces hold the hand attachment triangle, not visible mesh polygons.
+	// Attachment convention follows modern SurrealEngine VisibleMesh.cpp.
+	auto* pawn = UObject::TryCast<UPawn>(actor);
+	auto* weapon = pawn ? pawn->Weapon() : nullptr;
+	auto* weaponMesh = weapon ? weapon->ThirdPersonMesh() : nullptr;
+	if (weaponMesh && !mesh->SpecialFaces.empty())
+	{
+		vec3 points[3];
+		const auto& face = mesh->SpecialFaces.front();
+		for (int i = 0; i < 3; i++)
+		{
+			size_t index = face.Indices[i];
+			if (!mesh->ReMapAnimVerts.empty()) {
+				if (index >= mesh->ReMapAnimVerts.size()) return;
+				index = mesh->ReMapAnimVerts[index];
+			}
+			if (index + vertexOffsets[0] >= mesh->Verts.size() || index + vertexOffsets[1] >= mesh->Verts.size()) return;
+			vec3 v = mix(mesh->Verts[index + vertexOffsets[0]], mesh->Verts[index + vertexOffsets[1]], t0);
+			if (t1 != 0.0f) {
+				if (index + vertexOffsets[2] >= mesh->Verts.size()) return;
+				v = mix(v, mesh->Verts[index + vertexOffsets[2]], t1);
+			}
+			points[i] = (ObjectToWorld * vec4(v, 1.0f)).xyz();
+		}
+		Coords attachment;
+		attachment.XAxis = normalize(points[1] - points[0]);
+		attachment.YAxis = normalize(cross(attachment.XAxis, points[2] - points[0]));
+		attachment.ZAxis = normalize(cross(attachment.XAxis, attachment.YAxis));
+		attachment.Origin = -(points[0] + points[2]) * 0.5f;
+		mat4 transform = attachment.ToMatrix() * mat4::scale(weapon->ThirdPersonScale()) * weaponMesh->meshToObject;
+		mat3 normals = mat3::transpose(mat3(transform));
+		UpdateActorLightList(weapon);
+		if (auto* lod = UObject::TryCast<ULodMesh>(weaponMesh))
+			DrawLodMesh(frame, weapon, lod, transform, normals);
+		else
+			DrawMesh(frame, weapon, weaponMesh, transform, normals);
+	}
 }
 
 void RenderSubsystem::SetupMeshTextures(UActor* actor, UMesh* mesh)

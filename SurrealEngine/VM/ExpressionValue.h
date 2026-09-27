@@ -489,6 +489,8 @@ inline uint8_t ExpressionValue::ToByte() const
 		return (uint8_t)*PtrInt;
 	else if (Type == ExpressionValueType::ValueFloat)
 		return (uint8_t)*PtrFloat;
+	else if (Type == ExpressionValueType::Nothing)
+		return 0;
 	else
 		Exception::Throw("Not a byte compatible value");
 }
@@ -501,6 +503,8 @@ inline int32_t ExpressionValue::ToInt() const
 		return *PtrByte;
 	else if (Type == ExpressionValueType::ValueFloat)
 		return (int)*PtrFloat;
+	else if (Type == ExpressionValueType::Nothing)
+		return 0;
 	else
 		Exception::Throw("Not an int compatible value");
 }
@@ -509,6 +513,8 @@ inline bool ExpressionValue::ToBool() const
 {
 	if (Type == ExpressionValueType::ValueBool)
 		return BoolInfo.Get();
+	else if (Type == ExpressionValueType::Nothing)
+		return false;
 	else
 		Exception::Throw("Not a bool value");
 }
@@ -521,6 +527,8 @@ inline float ExpressionValue::ToFloat() const
 		return (float)*PtrInt;
 	else if (Type == ExpressionValueType::ValueByte)
 		return *PtrByte;
+	else if (Type == ExpressionValueType::Nothing)
+		return 0.0f;
 	else
 		Exception::Throw("Not a float compatible value");
 }
@@ -529,6 +537,8 @@ inline UObject* ExpressionValue::ToObject() const
 {
 	if (Type == ExpressionValueType::ValueObject)
 		return *PtrObject;
+	else if (Type == ExpressionValueType::Nothing)
+		return nullptr;
 	else
 		Exception::Throw("Not an object value");
 }
@@ -537,6 +547,11 @@ inline const vec3& ExpressionValue::ToVector() const
 {
 	if (Type == ExpressionValueType::ValueVector)
 		return *PtrVector;
+	else if (Type == ExpressionValueType::Nothing)
+	{
+		static const vec3 nothing(0.0f);
+		return nothing;
+	}
 	else
 		Exception::Throw("Not a vector value");
 }
@@ -545,6 +560,11 @@ inline const Rotator& ExpressionValue::ToRotator() const
 {
 	if (Type == ExpressionValueType::ValueRotator)
 		return *PtrRotator;
+	else if (Type == ExpressionValueType::Nothing)
+	{
+		static const Rotator nothing(0, 0, 0);
+		return nothing;
+	}
 	else
 		Exception::Throw("Not a rotator value");
 }

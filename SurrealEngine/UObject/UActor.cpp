@@ -402,7 +402,7 @@ void UActor::TickPhysics(float elapsed)
 			case PHYS_Falling: TickFalling(physTimeElapsed); break;
 			case PHYS_Swimming: TickSwimming(physTimeElapsed); break;
 			case PHYS_Flying: TickFlying(physTimeElapsed); break;
-			case PHYS_Rotating: TickRotating(physTimeElapsed); break;
+			case PHYS_Rotating: break;
 			case PHYS_Projectile: TickProjectile(physTimeElapsed); break;
 			case PHYS_Rolling: TickRolling(physTimeElapsed); break;
 			case PHYS_Interpolating: TickInterpolating(physTimeElapsed); break;
@@ -410,6 +410,8 @@ void UActor::TickPhysics(float elapsed)
 			case PHYS_Spider: TickSpider(physTimeElapsed); break;
 			case PHYS_Trailer: TickTrailer(physTimeElapsed); break;
 			}
+			// Upstream: walking/falling pawns must rotate too, not only PHYS_Rotating actors.
+			TickRotating(physTimeElapsed);
 		}
 
 		if (engine->LaunchInfo.engineVersion >= 400)
@@ -501,7 +503,7 @@ void UActor::TickWalking(float elapsed)
 	// "Step up and move" as long as we have time left and only hitting surfaces with low enough slope that it could be walked
 	float timeLeft = elapsed;
 	vec3 vel = Velocity();
-	if (vel.x != 0.0f && vel.y != 0.0f)
+	if (vel.x != 0.0f || vel.y != 0.0f)
 	{
 		for (int iteration = 0; timeLeft > 0.0f && iteration < 5; iteration++)
 		{
@@ -622,7 +624,6 @@ void UActor::TickFalling(float elapsed)
 		fluidFriction = pawn->FootRegion().Zone->ZoneFluidFriction();
 	}
 
-	ApplyRotationPhysics(*this, elapsed);
 
 	OldLocation() = Location();
 	bJustTeleported() = false;
@@ -840,7 +841,6 @@ void UActor::TickProjectile(float elapsed)
 		return;
 	}
 
-	ApplyRotationPhysics(*this, elapsed);
 
 	UZoneInfo* zone = Region().Zone;
 	UProjectile* projectile = UObject::TryCast<UProjectile>(this);
@@ -2176,6 +2176,7 @@ void UPawn::Tick(float elapsed, bool tickedFlag)
 		{
 			if (MoveTarget())
 			{
+				Focus() = MoveTarget()->Location();
 				TickRotateTo(Focus());
 				if (TickMoveTo(MoveTarget()->Location()))
 					StateFrame->LatentState = LatentRunState::Continue;
@@ -2195,6 +2196,7 @@ void UPawn::Tick(float elapsed, bool tickedFlag)
 		{
 			if (FaceTarget())
 			{
+				Focus() = FaceTarget()->Location();
 				TickRotateTo(Focus());
 				vec3 oldDest = Destination();
 				if (TickMoveTo(Destination()))
@@ -2361,14 +2363,31 @@ bool UPawn::TickRotateTo(const vec3& target)
 
 bool UPawn::TickMoveTo(const vec3& target)
 {
-	// To do: there is probably more to it than this!
-
-	Acceleration() = normalize(target - Location()) * AccelRate();
+	if (MoveTimer() < 0.0f)
+		return true;
 
 	if (Physics() == PHYS_Walking)
-		Acceleration().z = 0.0f;
+	{
+		vec2 delta = target.xy() - Location().xy();
+		float distSqr = dot(delta, delta);
+		float velocitySqr = dot(Velocity(), Velocity());
+		if (distSqr < 1.0f || distSqr < velocitySqr * 0.05f)
+			return true;
 
-	return MoveTimer() < 0.0f || length(target - Location()) < length(Velocity()) * 0.02f;
+		Acceleration() = vec3(normalize(delta) * AccelRate(), 0.0f);
+	}
+	else
+	{
+		vec3 delta = target - Location();
+		float distSqr = dot(delta, delta);
+		float velocitySqr = dot(Velocity(), Velocity());
+		if (distSqr < 1.0f || distSqr < velocitySqr * 0.05f)
+			return true;
+
+		Acceleration() = normalize(delta) * AccelRate();
+	}
+
+	return false;
 }
 
 void UPawn::MoveTo(const vec3& newDestination, float speed)
@@ -2389,9 +2408,14 @@ void UPawn::MoveToward(UActor* newTarget, float speed)
 		return;
 
 	MoveTarget() = newTarget;
+	Destination() = newTarget->Location();
+	Focus() = newTarget->Location();
 	bReducedSpeed() = false;
 	DesiredSpeed() = clamp(speed, 0.0f, MaxDesiredSpeed());
-	SetMoveDuration(newTarget->Location() - Location());
+	if (UObject::TryCast<UPawn>(newTarget))
+		MoveTimer() = 1.0f;
+	else
+		SetMoveDuration(newTarget->Location() - Location());
 	if (StateFrame)
 		StateFrame->LatentState = LatentRunState::MoveToward;
 }

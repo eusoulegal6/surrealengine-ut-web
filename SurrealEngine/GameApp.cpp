@@ -20,6 +20,8 @@ namespace fs = std::filesystem;
 #include "UObject/UClient.h"
 #include "UObject/UActor.h"
 #include "UObject/ULevel.h"
+#include "UObject/UClass.h"
+#include "VM/ScriptCall.h"
 Engine *EMSCRIPTEN_GLOBAL_GAME_ENGINE = nullptr;
 // Browser controls enter the same original key/axis binding system as SDL.
 extern "C" {
@@ -28,6 +30,10 @@ EMSCRIPTEN_KEEPALIVE void web_key(int key, int down) {
     auto* e = EMSCRIPTEN_GLOBAL_GAME_ENGINE;
     if (down) e->OnWindowKeyDown(static_cast<EInputKey>(key));
     else e->OnWindowKeyUp(static_cast<EInputKey>(key));
+}
+EMSCRIPTEN_KEEPALIVE void web_char(int codepoint) {
+    if (EMSCRIPTEN_GLOBAL_GAME_ENGINE && codepoint >= 32 && codepoint < 127)
+        EMSCRIPTEN_GLOBAL_GAME_ENGINE->OnWindowKeyChar(std::string(1, static_cast<char>(codepoint)));
 }
 EMSCRIPTEN_KEEPALIVE void web_look(int dx, int dy) {
     if (EMSCRIPTEN_GLOBAL_GAME_ENGINE) EMSCRIPTEN_GLOBAL_GAME_ENGINE->OnWindowRawMouseMove(dx,dy);
@@ -64,6 +70,12 @@ void emscripten_game_loop_step() {
                 bots += " | " + (bot->PlayerReplicationInfo() ? bot->PlayerReplicationInfo()->PlayerName() : bot->Name.ToString()) + ": " + bot->GetStateName().ToString()
                     + " hp=" + std::to_string(bot->Health())
                     + " hidden=" + std::to_string((bool)bot->bHidden())
+                    + " yaw=" + std::to_string(bot->Rotation().Yaw)
+                    + " desired=" + std::to_string(bot->DesiredRotation().Yaw)
+                    + " weapon=" + (bot->Weapon() ? bot->Weapon()->Class->Name.ToString() : "None")
+                    + " enemy=" + (bot->Enemy() && bot->Enemy()->PlayerReplicationInfo() ? bot->Enemy()->PlayerReplicationInfo()->PlayerName() : "None")
+                    + " see=" + std::to_string(bot->CanSee(player)) + " los=" + std::to_string(bot->LineOfSightTo(player)) + " probe=" + std::to_string(bot->IsEventEnabled(EventName::SeePlayer))
+                    + " score=" + (bot->PlayerReplicationInfo() ? std::to_string((int)bot->PlayerReplicationInfo()->Score()) : "0")
                     + " xyz=" + std::to_string((int)loc.x) + "," + std::to_string((int)loc.y) + "," + std::to_string((int)loc.z);
             }
             EM_ASM({

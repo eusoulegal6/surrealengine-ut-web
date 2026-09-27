@@ -64,8 +64,8 @@ void ULevel::Load(ObjectStream* stream)
 	{
 		LevelReachSpec spec;
 		spec.distance = stream->ReadInt32();
-		spec.startActor = stream->ReadIndex();
-		spec.endActor = stream->ReadIndex();
+		spec.startActor = stream->ReadObject<UNavigationPoint>();
+		spec.endActor = stream->ReadObject<UNavigationPoint>();
 		spec.collisionRadius = stream->ReadInt32();
 		spec.collisionHeight = stream->ReadInt32();
 		spec.reachFlags = stream->ReadInt32();

@@ -233,7 +233,12 @@ void RenderSubsystem::ProcessNode(BspNode* node)
 			if (actor->bCorona())
 				Scene.Coronas.push_back(actor);
 
-			if (!actor->bHidden() && actor != engine->CameraActor)
+			auto* viewportActor = engine->viewport->Actor();
+			bool behindView = viewportActor->bBehindView();
+			bool ownedByViewport = actor->IsOwnedBy(viewportActor);
+			bool ownerHidden = ((behindView || !ownedByViewport) && actor->bOnlyOwnerSee())
+				|| (!behindView && ownedByViewport && actor->bOwnerNoSee());
+			if (!actor->bHidden() && !ownerHidden && (actor != engine->CameraActor || behindView))
 			{
 				EDrawType dt = (EDrawType)actor->DrawType();
 				if (dt == DT_Mesh && actor->Mesh())
