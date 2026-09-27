@@ -46,7 +46,8 @@ void emscripten_game_loop_step() {
             auto p = player->Location(); auto v = player->Velocity(); auto r = player->ViewRotation();
             EM_ASM({
                 var el=document.getElementById('telemetry');
-                if(el)el.textContent='Frame '+$0+' | position '+Math.round($1)+','+Math.round($2)+','+Math.round($3)+' | velocity '+Math.round($4)+','+Math.round($5)+','+Math.round($6)+' | view '+$7+','+$8+' | health '+$9;
+                var now=performance.now();var fps=Module.utLastSample?15000/(now-Module.utLastSample):0;Module.utLastSample=now;
+                if(el)el.textContent='Frame '+$0+' | '+fps.toFixed(1)+' fps'+' | position '+Math.round($1)+','+Math.round($2)+','+Math.round($3)+' | velocity '+Math.round($4)+','+Math.round($5)+','+Math.round($6)+' | view '+$7+','+$8+' | health '+$9;
             }, frames, p.x,p.y,p.z,v.x,v.y,v.z,r.Pitch,r.Yaw,player->Health());
         }
     } catch (const std::exception& e) {
