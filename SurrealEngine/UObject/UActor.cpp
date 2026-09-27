@@ -1921,29 +1921,12 @@ bool UPawn::ActorReachable(UActor* anActor)
 	if (!anActor)
 		return false;
 
-	// Check if we are trying to reach a navigation point. They can also be hiding in an inventory for patent-pending spaghetti reasons.
-	UNavigationPoint* navPoint = UObject::TryCast<UNavigationPoint>(anActor);
-	if (UInventory* inventory = UObject::TryCast<UInventory>(anActor))
-		navPoint = inventory->myMarker();
-
 	vec3 eyePos = Location();
 	eyePos.z += BaseEyeHeight();
-
 	vec3 delta = anActor->Location() - Location();
 
-	// If we can reach any navigation point in the map then we can also reach the navigation point asked for
-	if (navPoint)
-	{
-		for (UNavigationPoint* cur = Level()->NavigationPointList(); cur != nullptr; cur = cur->nextNavigationPoint())
-		{
-			if (std::abs(cur->Location().z - Location().z) < CollisionHeight())
-			{
-				if (FastTrace(cur->Location(), eyePos) && TryMove(delta, true).Fraction == 1.0f)
-					return true;
-			}
-		}
-	}
-
+	// Direct reachability must apply the same hazard and distance checks to
+	// navigation points and pickups as it does to other actors.
 	UPawn* aPawn = UObject::TryCast<UPawn>(anActor);
 	if (aPawn)
 	{
@@ -2087,7 +2070,7 @@ UActor* UPawn::PickTarget(float& bestAim, float& bestDist, const vec3& FireDir, 
 	for (UPawn* pawn = Level()->PawnList(); pawn != nullptr; pawn = pawn->nextPawn())
 	{
 		// Skip dead pawns or ourselves
-		if (pawn == this || pawn->Health() > 0)
+		if (pawn == this || pawn->Health() <= 0 || pawn->bHidden() || pawn->bDeleteMe())
 			continue;
 
 		// Skip team mates
@@ -2147,13 +2130,13 @@ void UPawn::UpdateActorZone()
 	PointRegion oldfootregion = FootRegion();
 	PointRegion newfootregion = FindRegion({ 0.0f, 0.0f, -CollisionHeight() });
 	if (FootRegion().Zone && oldfootregion.Zone != newfootregion.Zone)
-		CallEvent(FootRegion().Zone, EventName::FootZoneChange, { ExpressionValue::ObjectValue(this) });
+		CallEvent(this, EventName::FootZoneChange, { ExpressionValue::ObjectValue(newfootregion.Zone) });
 	FootRegion() = newfootregion;
 
 	PointRegion oldheadregion = HeadRegion();
 	PointRegion newheadregion = FindRegion({ 0.0f, 0.0f, EyeHeight() });
 	if (HeadRegion().Zone && oldheadregion.Zone != newheadregion.Zone)
-		CallEvent(HeadRegion().Zone, EventName::HeadZoneChange, { ExpressionValue::ObjectValue(this) });
+		CallEvent(this, EventName::HeadZoneChange, { ExpressionValue::ObjectValue(newheadregion.Zone) });
 	HeadRegion() = newheadregion;
 
 	if (PlayerReplicationInfo())
