@@ -394,6 +394,9 @@ bool SDL2Window::GetKeyState(EInputKey key)
 
 void SDL2Window::OnKeyboardInput(SDL_KeyboardEvent& event)
 {
+#ifdef __EMSCRIPTEN__
+    return; // Browser controls.js owns key/button/relative-axis delivery.
+#endif
     if (event.state == SDL_PRESSED)
         windowHost->OnWindowKeyDown(SDLScancodeToInputKey(event.keysym.scancode));
     else if (event.state == SDL_RELEASED)
@@ -407,6 +410,9 @@ void SDL2Window::OnKeyboardTextInput(SDL_TextInputEvent& event)
 
 void SDL2Window::OnMouseInput(SDL_MouseButtonEvent& event)
 {
+#ifdef __EMSCRIPTEN__
+    return; // Browser controls.js owns key/button/relative-axis delivery.
+#endif
     EInputKey id = IK_None;
 
     switch (event.button) {
@@ -433,6 +439,9 @@ void SDL2Window::OnMouseInput(SDL_MouseButtonEvent& event)
 
 void SDL2Window::OnMouseWheel(SDL_MouseWheelEvent& event)
 {
+#ifdef __EMSCRIPTEN__
+    return; // Browser controls.js owns key/button/relative-axis delivery.
+#endif
     EInputKey id = IK_None;
 
     if (event.y > 0) // Scroll up
@@ -446,11 +455,16 @@ void SDL2Window::OnMouseWheel(SDL_MouseWheelEvent& event)
 
 void SDL2Window::OnMouseMove(SDL_MouseMotionEvent& event)
 {
+#ifdef __EMSCRIPTEN__
+    return; // Browser controls.js owns key/button/relative-axis delivery.
+#endif
     if (SDL_GetRelativeMouseMode() == SDL_TRUE) {
         windowHost->OnWindowRawMouseMove(event.xrel, event.yrel);
         int w, h;
         SDL_GetWindowSize(m_SDLWindow, &w, &h);
+        #ifndef __EMSCRIPTEN__
         SDL_WarpMouseInWindow(m_SDLWindow, w / 2, h / 2);
+#endif
     }
     else {
         windowHost->OnWindowMouseMove(Point(event.x, event.y));
@@ -469,7 +483,7 @@ Rect SDL2Window::GetWindowFrame() const
 Size SDL2Window::GetClientSize() const
 {
     int width, height;
-    SDL_Vulkan_GetDrawableSize(m_SDLWindow, &width, &height);
+    SDL_GL_GetDrawableSize(m_SDLWindow, &width, &height);
 
     return Size((double)width, (double)height);
 }
@@ -508,7 +522,7 @@ double SDL2Window::GetDpiScale() const
      */
     int drawable_width, window_width;
     SDL_GetWindowSize(m_SDLWindow, &window_width, nullptr);
-    SDL_Vulkan_GetDrawableSize(m_SDLWindow, &drawable_width, nullptr);
+    SDL_GL_GetDrawableSize(m_SDLWindow, &drawable_width, nullptr);
 
     return (double) drawable_width / (double) window_width;
 }

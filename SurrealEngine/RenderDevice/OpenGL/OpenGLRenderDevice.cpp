@@ -256,7 +256,6 @@ void OpenGLRenderDevice::Lock(vec4 FlashScale, vec4 FlashFog, vec4 ScreenClear)
 	renderingStartDate = now_ms.time_since_epoch();	
 
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-	std::cout << "OpenGLRenderDevice::Lock(vec4 FlashScale, vec4 FlashFog, vec4 ScreenClear)" << std::endl;
 	glEnable(GL_DEPTH_TEST);
 	
 	glClearColor(0.2f, 0.35f, 0.3f, 1.0f);
@@ -343,7 +342,6 @@ void OpenGLRenderDevice::drawVerticesForTexture(FTextureInfo *Texture, std::vect
 
 void OpenGLRenderDevice::Unlock(bool Blit)
 {
-	std::cout << "OpenGLRenderDevice::Unlock(bool Blit)" << Blit << std::endl;
 
 	if (Blit)
 	{
@@ -357,8 +355,6 @@ void OpenGLRenderDevice::Unlock(bool Blit)
 		std::chrono::milliseconds duration = renderingEndDate - renderingStartDate;
     	double fps = 1000.0 / duration.count();
 
-    	std::cout << "Rendering duration: " << duration.count() << " ms" << std::endl;
-    	std::cout << "FPS: " << fps << std::endl;
 	}
 }
 

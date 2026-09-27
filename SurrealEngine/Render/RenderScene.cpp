@@ -47,7 +47,6 @@ void RenderSubsystem::DrawScene()
 
 void RenderSubsystem::DrawFrame(const vec3& location, const mat4& worldToView)
 {
-	std::cout << "DrawFrame location x: " << location.x << " y: " << location.y << " z: " << location.z << std::endl;
 
 	SetupSceneFrame(worldToView);
 	Scene.Clipper.Setup(Scene.Frame.Projection * Scene.Frame.WorldToView * Scene.Frame.ObjectToWorld);

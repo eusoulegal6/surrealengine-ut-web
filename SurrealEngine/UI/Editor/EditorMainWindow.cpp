@@ -184,7 +184,6 @@ void EditorMainWindow::OnHelpAbout()
 
 void EditorMainWindow::LoadMap(std::string& mapName)
 {
-std::cout << "GP21" << std::endl;	
 	engine->LevelPackage = engine->packages->GetPackage(FilePath::remove_extension(mapName), 970);
 	engine->LevelInfo = UObject::Cast<ULevelInfo>(engine->LevelPackage->GetUObject("LevelInfo", "LevelInfo0"));
 	engine->Level = UObject::Cast<ULevel>(engine->LevelPackage->GetUObject("Level", "MyLevel"));

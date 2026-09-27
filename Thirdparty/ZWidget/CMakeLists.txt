@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.11)
 project(zwidget)
 
-if (!EMSCRIPTEN)
+if (NOT EMSCRIPTEN)
 if (UNIX AND NOT APPLE)
 	include(FindPkgConfig)
 	pkg_check_modules(DBUS REQUIRED dbus-1)
@@ -139,7 +139,12 @@ set(ZWIDGET_INCLUDE_DIRS include/zwidget src)
 
 set(ZWIDGET_COMPILE_OPTIONS ${CMAKE_CXX_FLAGS})
 
-if(WIN32)
+if(EMSCRIPTEN)
+  set(ZWIDGET_SOURCES ${ZWIDGET_SOURCES} ${ZWIDGET_SDL2_SOURCES})
+  set(ZWIDGET_DEFINES UNIX _UNIX USE_SDL2)
+  set(ZWIDGET_LIBS)
+  add_compile_options(-sUSE_SDL=2 -fexceptions)
+elseif(WIN32)
 	set(ZWIDGET_SOURCES ${ZWIDGET_SOURCES} ${ZWIDGET_WIN32_SOURCES})
 	set(ZWIDGET_DEFINES -DUNICODE -D_UNICODE)
 	set(ZWIDGET_LINK_OPTIONS)

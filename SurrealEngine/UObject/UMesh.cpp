@@ -39,7 +39,6 @@ void UMesh::Load(ObjectStream* stream)
 	//      of indicator as to what mesh type we're looking at.
 	//      Maybe just some optional metadata in the package that describes 
 	//			which type of mesh this is?
-std::cout << "GP13" << std::endl;
 	if (stream->GetPackage()->GetPackageManager()->IsDeusEx())
 	{
 		for (int i = 0; i < NumVerts; i++)

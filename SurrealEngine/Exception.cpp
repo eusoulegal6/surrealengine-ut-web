@@ -130,7 +130,7 @@ int Exception::CaptureStackFrames(std::ostringstream& sstream, int maxframes)
 
 
 /////////////////////////////////////////////////////////////////////
-#elif defined __linux__
+#elif defined __linux__ || defined __EMSCRIPTEN__
 
 	return 0;
 
@@ -140,7 +140,7 @@ int Exception::CaptureStackFrames(std::ostringstream& sstream, int maxframes)
 
 void Exception::Throw(const std::string& text)
 {
-	std::cout << "AAAAAAAAA EXCEPTION!!! " << text << std::endl;
+	std::cout << "Engine exception: " << text << std::endl;
 
 	std::ostringstream sstream;
 

@@ -74,7 +74,6 @@ UActor* UActor::Spawn(UClass* SpawnClass, UActor* SpawnOwner, NameString SpawnTa
 	}
 
 	// To do: package needs to be grabbed from outer, or the "transient package" if it is None, a virtual package for runtime objects
-std::cout << "GP20" << std::endl;
 
 	UActor* actor = UObject::Cast<UActor>(engine->packages->GetPackage("Engine", 953)->NewObject("", UObject::Cast<UClass>(SpawnClass), ObjectFlags::Transient, true));
 

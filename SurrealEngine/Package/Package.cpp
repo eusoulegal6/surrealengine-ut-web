@@ -230,7 +230,6 @@ void Package::LoadExportObject(int index)
 	{
 		UClass* objbase = UObject::Cast<UClass>(GetUObject(entry->ObjBase));
 		if (!objbase && objname != "Object") {
-std::cout << "GP26" << std::endl;			
 			objbase = UObject::Cast<UClass>(Packages->GetPackage("Core", 993)->GetUObject("Class", "Object"));
 		}
 		auto obj = std::make_unique<UClass>(objname, objbase, ExportTable[index].ObjFlags);
@@ -483,7 +482,6 @@ void Package::ReadTables()
 
 std::unique_ptr<ObjectStream> Package::OpenObjectStream(int index, const NameString& name, UClass* base)
 {
-	std::cout << "OpenObjectStream: " << name.ToString() << std::endl;
 	const auto& entry = ExportTable[index];
 	if (entry.ObjSize > 0)
 	{

@@ -57,14 +57,14 @@ GameLaunchInfo GameFolderSelection::GetLaunchInfo()
 	std::cout << "Selected game: " << selectedGame << std::endl;
 
 	GameLaunchInfo info;
-	info.engineVersion = 227;					// Engine version (e.g. 226, 227, 436...)
+	info.engineVersion = 436;					// Engine version (e.g. 226, 227, 436...)
 	info.engineSubVersion = 0;				// Engine sub version displayed as a letter (Note: Isn't always consistent)
 	info.noEntryMap = false;
 	info.gameName = "Unreal Tournament";				// Name of the game (e.g. "Unreal Tournament")
 	info.gameRootFolder = "UnrealTournament";		// Path to the folder that contains all the subfolders and files
 	info.gameExecutableName = "UnrealTournament";	// Name of the game executable (e.g. "UnrealTournament")
-	info.gameVersionString = "227j";		// Version (+ sub version) info as a string (e.g. "469d")
-	info.url = "UnrealTournament";	
+	info.gameVersionString = "436";		// Version (+ sub version) info as a string (e.g. "469d")
+	info.url = "DM-Deck16][.unr";	
 	// GameLaunchInfo info = foundGames[selectedGame];
 
 	info.engineVersion = commandline->GetArgInt("-e", "--engineversion", info.engineVersion);

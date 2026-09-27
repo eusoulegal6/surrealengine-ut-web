@@ -240,7 +240,6 @@ void PackageManager::DelayLoadNow()
 
 UObject* PackageManager::NewObject(const NameString& name, const NameString& package, const NameString& className)
 {
-std::cout << "GP24" << std::endl;	
 	Package* pkg = GetPackage(package, 989);
 	UClass* cls = UObject::Cast<UClass>(pkg->GetUObject("Class", className));
 	if (!cls)
@@ -250,7 +249,6 @@ std::cout << "GP24" << std::endl;
 
 UObject* PackageManager::NewObject(const NameString& name, UClass* cls)
 {
-std::cout << "GP23" << std::endl;	
 	// To do: package needs to be grabbed from outer, or the "transient package" if it is None, a virtual package for runtime objects
 	return GetPackage("Engine", 988)->NewObject(name, cls, ObjectFlags::NoFlags, true);
 }

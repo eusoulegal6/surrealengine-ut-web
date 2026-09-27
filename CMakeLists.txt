@@ -2,13 +2,15 @@ cmake_minimum_required(VERSION 3.15)
 
 project(SurrealEngine)
 
+if(NOT EMSCRIPTEN)
 add_subdirectory(Thirdparty/ZVulkan)
+endif()
 add_subdirectory(Thirdparty/ZWidget)
 if(WIN32)
 	add_subdirectory(Thirdparty/openal-soft)
 	find_package(SDL2)
 endif()
-if(UNIX AND NOT APPLE)
+if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
 	find_package(SDL2 QUIET)
 	if(NOT ${SDL2_FOUND})
 		include(FindPkgConfig)
@@ -500,30 +502,13 @@ set(SURREALENGINE_SOURCES
 )
 
 if(EMSCRIPTEN)
-add_compile_definitions(NO_SSE)
-set(CMAKE_CXX_FLAGS "-s MIN_WEBGL_VERSION=2 \
--s MAX_WEBGL_VERSION=2 \
--s EXCEPTION_DEBUG \
--fexceptions \
---preload-file UnrealTournament/ \
---preload-file SurrealEngine.pk3 \
---bind \
---use-preload-plugins \
--Wall \
--Wextra \
--Werror=return-type \
--s USE_SDL=2 \
--s ASSERTIONS=1 \
--w \
--g4 \
--s DISABLE_EXCEPTION_CATCHING=0 \
--O3 \
---no-heap-copy \
--s ALLOW_MEMORY_GROWTH=1 \
--s EXIT_RUNTIME=1")
+  add_compile_definitions(NO_SSE USE_SDL2)
+  add_compile_options(-fexceptions -sUSE_SDL=2)
+  list(FILTER SURREALCOMMON_SOURCES EXCLUDE REGEX "/RenderDevice/(Vulkan|OpenGL)/")
+  list(APPEND SURREALCOMMON_SOURCES SurrealEngine/RenderDevice/WebGL/WebGLRenderDevice.cpp)
+  set(SURREALCOMMON_LIBS zwidget)
 else()
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O4")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 endif()
 
 source_group("SurrealEngine" REGULAR_EXPRESSION "${CMAKE_CURRENT_SOURCE_DIR}/SurrealEngine/.+")
@@ -571,7 +556,11 @@ if(NOT APPLE AND SDL2_FOUND)
 	endif()
 endif()
 
-if(WIN32)
+if(EMSCRIPTEN)
+  set(SURREALCOMMON_SOURCES ${SURREALCOMMON_SOURCES} ${SURREALCOMMON_SDL2_SOURCES})
+  set(SURREALCOMMON_LIBS ${SURREALCOMMON_LIBS} openal)
+  add_definitions(-DUNIX -D_UNIX)
+elseif(WIN32)
 	if (SDL2_FOUND)
 		set(SURREALCOMMON_SOURCES ${SURREALCOMMON_SOURCES} ${SURREALCOMMON_WIN32_SOURCES} ${SURREALCOMMON_SDL2_SOURCES})
 		set(SURREALCOMMON_LIBS ${SURREALCOMMON_LIBS} ${SURREALCOMMON_WIN32_LIBS} ${SDL2_LIBRARIES})
@@ -609,7 +598,17 @@ target_precompile_headers(SurrealCommon PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${CMAK
 
 add_executable(SurrealEngine WIN32 MACOSX_BUNDLE ${SURREALENGINE_SOURCES})
 
-target_link_libraries(SurrealEngine SurrealCommon GL GLEW ${SURREALCOMMON_LIBS})
+target_link_libraries(SurrealEngine SurrealCommon ${SURREALCOMMON_LIBS})
+if(EMSCRIPTEN)
+  target_link_options(SurrealEngine PRIVATE
+    -sUSE_SDL=2 -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2
+    -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=134217728 -sMAXIMUM_MEMORY=1073741824
+    -sDISABLE_EXCEPTION_CATCHING=0 -sASSERTIONS=1 -sEXIT_RUNTIME=0
+    "-sEXPORTED_RUNTIME_METHODS=['FS','callMain']" -sINVOKE_RUN=0
+    "--preload-file" "${CMAKE_CURRENT_SOURCE_DIR}/SurrealEngine.pk3@/SurrealEngine.pk3")
+else()
+  target_link_libraries(SurrealEngine GL GLEW)
+endif()
 set_target_properties(SurrealEngine PROPERTIES CXX_STANDARD 17)
 
 if(WIN32)
