@@ -1,3 +1,4 @@
+#include "DecodeS3TC.h"
 #include "WebGLRenderDevice.h"
 #include "Precomp.h"
 #include "UObject/ULevel.h"
@@ -164,6 +165,11 @@ void WebGLRenderDevice::bind(FTextureInfo *info, int unit, bool masked,
           rgba[j * 4 + 2] = c.B;
           rgba[j * 4 + 3] = (masked && n == 0) ? 0 : 255;
         }
+        data = rgba.data();
+      } else if (info->Format == TextureFormat::BC1 || info->Format == TextureFormat::BC1_PA ||
+                 info->Format == TextureFormat::BC2 || info->Format == TextureFormat::BC3) {
+        rgba = DecodeS3TC(mip.Data, mip.Width, mip.Height,
+                         info->Format == TextureFormat::BC2 ? 2 : info->Format == TextureFormat::BC3 ? 3 : 1);
         data = rgba.data();
       } else if (info->Format == TextureFormat::RGBA32_F) {
         type = GL_FLOAT;

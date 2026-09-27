@@ -29,6 +29,20 @@
 
 #include "RenderDevice/OpenGL/OpenGLRenderDevice.h"
 
+#if __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
+// Browser downloads must finish before LoadMap unloads the current world.
+static int PrepareMapForTravel(const UnrealURL& url)
+{
+#if __EMSCRIPTEN__
+    return EM_ASM_INT({ return window.utPrepareMap ? window.utPrepareMap(UTF8ToString($0)) : 1; }, url.Map.c_str());
+#else
+    return 1;
+#endif
+}
+
 Engine* engine = nullptr;
 
 Engine::Engine(GameLaunchInfo launchinfo) : LaunchInfo(launchinfo)
@@ -121,6 +135,9 @@ void Engine::Run()
 #endif
 
 		float realTimeElapsed = CalcTimeElapsed();
+#if __EMSCRIPTEN__
+        if (EM_ASM_INT({ return !!window.utMapPending; })) return;
+#endif
 		float entryLevelElapsed = EntryLevel ? clamp(realTimeElapsed * EntryLevelInfo->TimeDilation(), 1.0f / 400.0f, 1.0f / 2.5f) : 0.0f;
 		float levelElapsed = clamp(realTimeElapsed * LevelInfo->TimeDilation(), 1.0f / 400.0f, 1.0f / 2.5f);
 
@@ -147,7 +164,11 @@ void Engine::Run()
 		{
 			LevelInfo->NextSwitchCountdown() -= levelElapsed;
 			if (LevelInfo->NextSwitchCountdown() <= 0.0f)
-			{
+            {
+                UnrealURL next = LevelInfo->NextURL() == "?RESTART" ? LevelInfo->URL : UnrealURL(LevelInfo->URL, LevelInfo->NextURL());
+                int ready = PrepareMapForTravel(next);
+                if (ready < 0) LevelInfo->NextURL().clear();
+                if (ready <= 0) return;
 				if (LevelInfo->NextURL() == "?RESTART")
 				{
 					LoadMap(LevelInfo->URL, Level->TravelInfo);
@@ -187,6 +208,9 @@ void Engine::Run()
 			// To do: need to do something about that travel type and transfering of items
 
 			UnrealURL url(LevelInfo->URL, ClientTravelInfo.URL);
+            int ready = PrepareMapForTravel(url);
+            if (ready < 0) ClientTravelInfo.URL.Map.clear();
+            if (ready <= 0) return;
 
 			auto travelInfo = Level->TravelInfo;
 			for (UActor* actor : Level->Actors)
@@ -758,8 +782,8 @@ std::string Engine::ConsoleCommand(UObject* context, const std::string& commandl
 			if (strcasecmp(mapname.c_str(), url.Map.c_str()) == 0)
 #endif
 			{
-				LoadMap(url);
-				LoginPlayer();
+                ClientTravel(maparg, 0, false);
+                return {};
 			}	
 		}
 
