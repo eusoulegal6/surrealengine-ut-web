@@ -21,6 +21,12 @@ bool TraceRayLevel::TraceAnyHit(ULevel* level, vec3 from, vec3 to, UActor* traci
 
 	float margin = 1.0f;
 	tmax += margin;
+	if (traceWorld)
+	{
+		for (UActor* actor : Level->Hash.Movers)
+			if (actor != tracingActor && actor->bBlockActors() && actor->TraceTest(level, origin, tmin, direction, tmax, 0.0, 0.0) < tmax)
+				return true;
+	}
 
 	if (traceActors)
 	{
@@ -39,6 +45,7 @@ bool TraceRayLevel::TraceAnyHit(ULevel* level, vec3 from, vec3 to, UActor* traci
 						{
 							for (UActor* actor : it->second)
 							{
+								if (UObject::TryCast<UMover>(actor)) continue;
 								if (actor != tracingActor && actor->bBlockActors() && Level->Hash.RayActorTrace(origin, tmin, direction, tmax, actor) < tmax)
 									return true;
 							}

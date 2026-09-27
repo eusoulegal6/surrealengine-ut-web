@@ -10,6 +10,8 @@ class CollisionHash
 {
 public:
 	std::unordered_map<uint32_t, std::list<UActor*>> CollisionActors;
+	// Movers may be much larger than their actor collision cylinder.
+	std::list<UActor*> Movers;
 
 	void AddToCollision(UActor* actor);
 	void RemoveFromCollision(UActor* actor);

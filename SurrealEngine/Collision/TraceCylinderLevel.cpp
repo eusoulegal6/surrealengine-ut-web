@@ -25,6 +25,15 @@ CollisionHitList TraceCylinderLevel::Trace(ULevel* level, const vec3& from, cons
 	tmax += margin;
 
 	CollisionHitList hits;
+	if (traceWorld)
+	{
+		for (UActor* actor : Level->Hash.Movers)
+		{
+			CollisionHit hit = static_cast<UMover*>(actor)->TraceBrush(origin, tmin, direction, tmax, height, radius);
+			if (hit.Fraction < tmax)
+				hits.push_back(hit);
+		}
+	}
 
 	if (traceActors)
 	{
@@ -47,6 +56,7 @@ CollisionHitList TraceCylinderLevel::Trace(ULevel* level, const vec3& from, cons
 						{
 							for (UActor* actor : it->second)
 							{
+								if (UObject::TryCast<UMover>(actor)) continue;
 								double t = actor->TraceTest(level, origin, tmin, direction, tmax, dheight, dradius);
 								if (t < tmax)
 								{

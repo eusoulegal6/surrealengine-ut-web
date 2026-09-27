@@ -11,6 +11,7 @@
 #include "Collision/TraceAABBModel.h"
 #include "Collision/TraceRayModel.h"
 #include "Collision/OverlapCylinderLevel.h"
+#include "Collision/BrushTraceTransform.h"
 #include <iostream>
 
 static std::string tickEventName = "Tick";
@@ -516,11 +517,9 @@ void UActor::TickWalking(float elapsed)
 			moveDelta = vel * timeLeft;
 
 			// step back down so we don't bump our heads
-			hit = TryMove(stepDownDelta);
-			if (hit.Fraction == 1.0f || dot(hit.Normal, vec3(0.0f, 0.0f, 1.0f)) < 0.7071f)
+			if (!TryStepToGround(stepDownDelta))
 			{
-				// TODO: do we really have to TryMove again? we can't set the Location directly?
-				TryMove(stepUpDelta);
+				TryMove(-stepUpDelta);
 				SetPhysics(PHYS_Falling);
 				return;
 			}
@@ -572,13 +571,11 @@ void UActor::TickWalking(float elapsed)
 				return;
 		}
 
-		// Step down after movement to see if we are still walking or if we are now falling
-		CollisionHit hit = TryMove(stepDownDelta, true);
-		if (Physics() == PHYS_Walking && (hit.Fraction == 1.0f || dot(hit.Normal, vec3(0.0f, 0.0f, 1.0f)) < 0.7071f))
-		{
-			SetPhysics(PHYS_Falling);
-		}
 	}
+	// A stationary pawn still needs floor support (including a moving lift).
+	if (Physics() == PHYS_Walking && !TryStepToGround(stepDownDelta))
+		SetPhysics(PHYS_Falling);
+
 	if (!bJustTeleported())
 		Velocity() = (Location() - OldLocation()) / elapsed;
 	Velocity().z = 0.0f;
@@ -664,6 +661,12 @@ void UActor::TickFalling(float elapsed)
 
 		if (hit.Fraction < 1.0f)
 		{
+			if (pawn && !bBounce() && velocity.z <= 0.0f && hit.Normal.z >= 0.7071f)
+			{
+				SetBase(hit.Actor ? hit.Actor : Level(), true);
+				PhysLanded(hit.Normal);
+				return;
+			}
 			if (hit.Actor != nullptr)
 			{
 				// TODO: Hit an actor
@@ -1088,6 +1091,21 @@ void UActor::PhysLanded(const vec3& hitNormal)
 void UActor::SetPhysics(uint8_t newPhysics)
 {
 	Physics() = newPhysics;
+	if (newPhysics == PHYS_Falling)
+		SetBase(nullptr, true);
+}
+
+bool UActor::TryStepToGround(const vec3& delta)
+{
+	if (dot(delta, delta) < 0.0001f)
+		return false;
+	CollisionHit floor = TryMove(delta, true);
+	if (floor.Fraction >= 1.0f || dot(floor.Normal, normalize(-delta)) < 0.7071f)
+		return false;
+	TryMove(delta * floor.Fraction);
+	if (Physics() == PHYS_Walking)
+		SetBase(floor.Actor ? floor.Actor : Level(), true);
+	return true;
 }
 
 void UActor::SetCollision(bool newColActors, bool newBlockActors, bool newBlockPlayers)
@@ -1217,7 +1235,7 @@ bool UActor::IsOverlapping(UActor* other)
 	return CollisionHash::CylinderActorOverlap(to_dvec3(Location()), CollisionHeight(), CollisionRadius(), other);
 }
 
-CollisionHit UActor::TryMove(const vec3& delta, bool dryRun)
+CollisionHit UActor::TryMove(const vec3& delta, bool dryRun, bool isOwnBaseBlocking)
 {
 	// Static and non-movable objects can't move
 	if (bStatic() || !bMovable())
@@ -1248,7 +1266,7 @@ CollisionHit UActor::TryMove(const vec3& delta, bool dryRun)
 					isBlocking = hit.Actor->bBlockActors() && bBlockActors();
 
 				// We never hit ourselves or anything moving along with us
-				if (isBlocking && !hit.Actor->IsBasedOn(this) && !IsBasedOn(hit.Actor))
+				if (isBlocking && (isOwnBaseBlocking || !hit.Actor->IsBasedOn(this)) && !IsBasedOn(hit.Actor))
 				{
 					blockingHit = hit;
 					break;
@@ -1281,7 +1299,7 @@ CollisionHit UActor::TryMove(const vec3& delta, bool dryRun)
 			UActor* actor = level->Actors[i];
 			if (actor && actor->ActorBase() == this)
 			{
-				actor->TryMove(actuallyMoved);
+				actor->TryMove(actuallyMoved, false, false);
 			}
 		}
 	}
@@ -1945,7 +1963,14 @@ bool UPawn::ActorReachable(UActor* anActor)
 	if (anActor->Region().Zone->bWaterZone() && !bCanSwim())
 		return false;
 
-	return FastTrace(anActor->Location(), eyePos) && TryMove(delta, true).Fraction == 1.0f;
+	if (!FastTrace(anActor->Location(), eyePos))
+		return false;
+	if (Physics() == PHYS_Walking)
+	{
+		float goalRadius = aPawn ? CollisionRadius() + aPawn->CollisionRadius() + 1.0f : 1.0f;
+		return WalkReachable(anActor->Location(), goalRadius);
+	}
+	return TryMove(delta, true).Fraction == 1.0f;
 }
 
 bool UPawn::PointReachable(vec3 aPoint)
@@ -1958,6 +1983,8 @@ bool UPawn::PointReachable(vec3 aPoint)
 		return false;
 
 	vec3 delta = aPoint - Location();
+	if (Physics() == PHYS_Walking)
+		return WalkReachable(aPoint);
 	return TryMove(delta, true).Fraction == 1.0f;
 }
 
@@ -2588,24 +2615,34 @@ void UDecal::DetachDecal()
 
 double UMover::TraceTest(ULevel* level, const dvec3& origin, double tmin, const dvec3& direction, double tmax, double height, double radius)
 {
-	CollisionHitList worldHits;
+	return TraceBrush(origin, tmin, direction, tmax, height, radius).Fraction;
+}
 
+CollisionHit UMover::TraceBrush(const dvec3& origin, double tmin, const dvec3& direction, double tmax, double height, double radius)
+{
+	CollisionHit result;
+	result.Fraction = (float)tmax;
+	if (!Brush() || Brush()->Nodes.empty())
+		return result;
+	BrushTraceTransform transform(Location(), Rotation(), PrePivot(), DrawScale());
+	if (!transform.Valid())
+		return result;
+	CollisionHitList hits;
 	if (radius == 0.0 && height == 0.0)
 	{
-		// Line/triangle intersect
-		TraceRayModel tracemodel;
-		worldHits = tracemodel.Trace(Brush(), origin, tmin, direction, tmax, false);
+		TraceRayModel trace;
+		hits = trace.Trace(Brush(), transform.Point(origin), tmin, transform.Direction(direction), tmax, false);
 	}
 	else
 	{
-		// AABB/Triangle intersect
-		TraceAABBModel tracemodel;
-		dvec3 extents = { (double)radius, (double)radius, (double)height };
-		worldHits = tracemodel.Trace(Brush(), origin, tmin, direction, tmax, extents, false);
+		TraceAABBModel trace;
+		hits = trace.Trace(Brush(), transform.Point(origin), tmin, transform.Direction(direction), tmax, transform.Extents(height, radius), false);
 	}
-
-	if (worldHits.empty())
-		return tmax;
-
-	return worldHits.front().Fraction;
+	if (!hits.empty())
+	{
+		result = hits.front();
+		result.Normal = transform.Normal(result.Normal);
+		result.Actor = this;
+	}
+	return result;
 }

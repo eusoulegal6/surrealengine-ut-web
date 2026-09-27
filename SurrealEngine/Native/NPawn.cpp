@@ -136,8 +136,7 @@ void NPawn::PickTarget(UObject* Self, float& bestAim, float& bestDist, const vec
 
 void NPawn::PickWallAdjust(UObject* Self, BitfieldBool& ReturnValue)
 {
-	engine->LogUnimplemented("Pawn.PickWallAdjust");
-	ReturnValue = false;
+	ReturnValue = UObject::Cast<UPawn>(Self)->PickWallAdjust();
 }
 
 void NPawn::RemovePawn(UObject* Self)

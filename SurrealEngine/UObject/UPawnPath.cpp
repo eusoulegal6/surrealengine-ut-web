@@ -410,3 +410,133 @@ vec3 UPawn::EAdjustJump()
 	velocity.y = delta.y * (speed / distance);
 	return velocity;
 }
+
+// Based on the step/settle approach in SurrealEngine UPawn_ReachWalking.cpp
+// (597a08d1). Probe the collision cylinder without moving the real pawn or
+// sending touch/zone events. Visibility alone cannot prove a walkable route.
+bool UPawn::WalkReachable(const vec3& goal, float goalRadius, float maxDrop)
+{
+	struct RestoreLocation
+	{
+		vec3& location;
+		vec3 saved;
+		~RestoreLocation() { location = saved; }
+	} restore{ Location(), Location() };
+
+	const float gravitySign = Region().Zone && Region().Zone->ZoneGravity().z > 0.0f ? 1.0f : -1.0f;
+	const float stepLength = std::max(CollisionRadius() * 2.0f, 8.0f);
+	const float stepHeight = std::max(MaxStepHeight(), 0.0f);
+	const float radius = std::max(goalRadius, 1.0f);
+	const vec3 up(0.0f, 0.0f, -gravitySign);
+
+	for (int iteration = 0; iteration < 64; iteration++)
+	{
+		vec3 toGoal = goal - Location();
+		toGoal.z = 0.0f;
+		float distance = length(toGoal);
+		if (distance <= radius)
+			return std::abs(goal.z - Location().z) <= CollisionHeight();
+
+		vec3 start = Location();
+		vec3 move = toGoal * (std::min(stepLength, distance) / distance);
+		CollisionHit hit = TryMove(move, true);
+		Location() += move * hit.Fraction;
+		float raised = 0.0f;
+		if (hit.Fraction < 1.0f)
+		{
+			vec3 remaining = move * (1.0f - hit.Fraction);
+			CollisionHit ceiling = TryMove(up * stepHeight, true);
+			raised = stepHeight * ceiling.Fraction;
+			Location() += up * raised;
+			hit = TryMove(remaining, true);
+			Location() += remaining * hit.Fraction;
+		}
+
+		// Sample the floor after every cylinder-width step, so a gap cannot be
+		// mistaken for a bridge merely because the far endpoint is visible.
+		vec3 down = -up * (raised + std::max(maxDrop, stepHeight) + 2.0f);
+		CollisionHit floor = TryMove(down, true);
+		if (floor.Fraction >= 1.0f || dot(floor.Normal, up) < 0.7071f)
+			return false;
+		Location() += down * floor.Fraction;
+
+		auto* zone = FindRegion(-up * CollisionHeight()).Zone;
+		if (zone && ((zone->bPainZone() && zone->DamageType() != ReducedDamageType()) || (zone->bWaterZone() && !bCanSwim())))
+			return false;
+
+		vec2 progress = Location().xy() - start.xy();
+		if (dot(progress, progress) < 0.01f)
+			return false;
+	}
+	return false;
+}
+
+// Implements Engine.Pawn's native contract: jump a low obstruction if the
+// cylinder clears it, otherwise try perpendicular routes with floor checks.
+bool UPawn::PickWallAdjust()
+{
+	if (Physics() != PHYS_Walking)
+		return false;
+
+	vec2 direction = Acceleration().xy();
+	if (dot(direction, direction) < 0.001f)
+		direction = (Destination() - Location()).xy();
+	if (dot(direction, direction) < 0.001f)
+		return false;
+	vec3 forward(normalize(direction), 0.0f);
+	const float distance = std::max(CollisionRadius() * 2.0f, 32.0f);
+	vec3 forwardStep = forward * distance;
+
+	if (bCanJump() && JumpZ() > 0.0f && TryMove(forwardStep, true).Fraction < 1.0f)
+	{
+		const float gravity = Region().Zone ? -Region().Zone->ZoneGravity().z : 980.0f;
+		const float jumpHeight = gravity > 0.0f ? std::min(CollisionHeight(), JumpZ() * JumpZ() / (2.0f * gravity)) : 0.0f;
+		bool canJump = false;
+		{
+			struct RestoreLocation
+			{
+				vec3& location;
+				vec3 saved;
+				~RestoreLocation() { location = saved; }
+			} restore{ Location(), Location() };
+			vec3 up(0.0f, 0.0f, jumpHeight);
+			if (jumpHeight > MaxStepHeight() && TryMove(up, true).Fraction == 1.0f)
+			{
+				Location() += up;
+				if (TryMove(forwardStep, true).Fraction == 1.0f)
+				{
+					Location() += forwardStep;
+					vec3 down(0.0f, 0.0f, -jumpHeight - MaxStepHeight() - 2.0f);
+					CollisionHit floor = TryMove(down, true);
+					if (floor.Fraction < 1.0f && floor.Normal.z >= 0.7071f)
+					{
+						Location() += down * floor.Fraction;
+						auto* zone = FindRegion(vec3(0.0f, 0.0f, -CollisionHeight())).Zone;
+						canJump = !zone || ((!zone->bPainZone() || zone->DamageType() == ReducedDamageType()) && (!zone->bWaterZone() || bCanSwim()));
+					}
+				}
+			}
+		}
+		if (canJump)
+		{
+			bFromWall() = false;
+			Velocity().z = JumpZ();
+			SetPhysics(PHYS_Falling);
+			// The original script still needs its destination after landing.
+			return true;
+		}
+	}
+
+	vec3 side(forward.y, -forward.x, 0.0f);
+	for (float sign : { 1.0f, -1.0f })
+	{
+		vec3 candidate = Location() + side * (distance * sign);
+		if (WalkReachable(candidate, 1.0f, MaxStepHeight()))
+		{
+			bFromWall() = true;
+			Destination() = candidate;
+			return true;
+		}
+	}
+	return false;
+}

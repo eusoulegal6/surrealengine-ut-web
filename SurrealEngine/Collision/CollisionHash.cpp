@@ -8,6 +8,8 @@ void CollisionHash::AddToCollision(UActor* actor)
 {
 	if (actor->bCollideActors())
 	{
+		if (UObject::TryCast<UMover>(actor))
+			Movers.push_back(actor);
 		vec3 location = actor->Location();
 		float height = actor->CollisionHeight();
 		float radius = actor->CollisionRadius();
@@ -35,6 +37,8 @@ void CollisionHash::AddToCollision(UActor* actor)
 
 void CollisionHash::RemoveFromCollision(UActor* actor)
 {
+	if (UObject::TryCast<UMover>(actor))
+		Movers.remove(actor);
 	if (actor->CollisionHashInfo.Inserted)
 	{
 		vec3 location = actor->CollisionHashInfo.Location;

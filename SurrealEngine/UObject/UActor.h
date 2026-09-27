@@ -192,7 +192,8 @@ public:
 	UObject* Trace(vec3& hitLocation, vec3& hitNormal, const vec3& traceEnd, const vec3& traceStart, bool bTraceActors, const vec3& extent);
 	bool FastTrace(const vec3& traceEnd, const vec3& traceStart);
 
-	CollisionHit TryMove(const vec3 & delta, bool dryRun = false);
+	CollisionHit TryMove(const vec3 & delta, bool dryRun = false, bool isOwnBaseBlocking = true);
+	bool TryStepToGround(const vec3& delta);
 	CollisionHit TryMoveSmooth(const vec3& delta);
 	bool Move(const vec3& delta);
 	bool MoveSmooth(const vec3& delta);
@@ -1323,6 +1324,7 @@ public:
 	using UBrush::UBrush;
 
 	virtual double TraceTest(ULevel* level, const dvec3& origin, double tmin, const dvec3& dirNormalized, double tmax, double height, double radius);
+	CollisionHit TraceBrush(const dvec3& origin, double tmin, const dvec3& direction, double tmax, double height, double radius);
 
 	vec3& BasePos() { return Value<vec3>(PropOffsets_Mover.BasePos); }
 	Rotator& BaseRot() { return Value<Rotator>(PropOffsets_Mover.BaseRot); }
@@ -1414,6 +1416,8 @@ public:
 	bool CanHearNoise(UActor* source, float loudness);
 	bool ActorReachable(UActor* anActor);
 	bool PointReachable(vec3 aPoint);
+	bool WalkReachable(const vec3& goal, float goalRadius = 1.0f, float maxDrop = 1024.0f);
+	bool PickWallAdjust();
 
 	// Native prerequisites used by the original Botpack AI.
 	vec3 EAdjustJump();
