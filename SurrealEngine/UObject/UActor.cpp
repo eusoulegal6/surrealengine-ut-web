@@ -2332,7 +2332,7 @@ void UPawn::TickRotating(float elapsed)
 		rot.Pitch = DesiredRotation().Pitch & 0xffff;
 		if (rot.Pitch < 0x8000)
 		{
-			rot.Pitch = std::max(rot.Pitch, RotationRate().Pitch);
+			rot.Pitch = std::min(rot.Pitch, RotationRate().Pitch);
 		}
 		else if (rot.Pitch < 0x10000 - RotationRate().Pitch)
 		{
@@ -2357,8 +2357,9 @@ bool UPawn::TickRotateTo(const vec3& target)
 		DesiredRotation().Pitch = 0;
 	}
 
-	int doneAngle = 2000;
-	return (std::abs(DesiredRotation().Yaw - (Rotation().Yaw & 0xffff)) < doneAngle) || (std::abs(DesiredRotation().Yaw - (Rotation().Yaw & 0xffff)) > 0xffff - doneAngle);
+	// Script rotations can be signed or extend beyond one revolution.
+	int yawDelta = (((DesiredRotation().Yaw & 0xffff) - (Rotation().Yaw & 0xffff) + 0x8000) & 0xffff) - 0x8000;
+	return std::abs(yawDelta) < 2000;
 }
 
 bool UPawn::TickMoveTo(const vec3& target)
@@ -2366,22 +2367,26 @@ bool UPawn::TickMoveTo(const vec3& target)
 	if (MoveTimer() < 0.0f)
 		return true;
 
+	constexpr float arrivalLookahead = 0.05f;
 	if (Physics() == PHYS_Walking)
 	{
 		vec2 delta = target.xy() - Location().xy();
 		float distSqr = dot(delta, delta);
-		float velocitySqr = dot(Velocity(), Velocity());
-		if (distSqr < 1.0f || distSqr < velocitySqr * 0.05f)
+		float velocitySqr = dot(Velocity().xy(), Velocity().xy());
+		bool heightReached = std::abs(target.z - Location().z) <= CollisionHeight();
+		if (heightReached && (distSqr < 1.0f || distSqr < velocitySqr * arrivalLookahead * arrivalLookahead))
 			return true;
 
-		Acceleration() = vec3(normalize(delta) * AccelRate(), 0.0f);
+		// A target directly above/below us is not reached; let the movement
+		// timeout release the script without normalizing a zero vector.
+		Acceleration() = distSqr > 0.0f ? vec3(normalize(delta) * AccelRate(), 0.0f) : vec3(0.0f);
 	}
 	else
 	{
 		vec3 delta = target - Location();
 		float distSqr = dot(delta, delta);
 		float velocitySqr = dot(Velocity(), Velocity());
-		if (distSqr < 1.0f || distSqr < velocitySqr * 0.05f)
+		if (distSqr < 1.0f || distSqr < velocitySqr * arrivalLookahead * arrivalLookahead)
 			return true;
 
 		Acceleration() = normalize(delta) * AccelRate();

@@ -282,9 +282,12 @@ UObject* UPawn::FindPathToward(UObject* anActor, bool singlePath)
 	{
 		if (!MarkReachableNavEndPoints())
 			return SetRouteCache({});
-		if (!IsInPathSpecialHandling)
-			return PathSpecialHandling(FindPathToEndPoint(aNavPoint, 1000).first);
-		return SetRouteCache({});
+		auto path = FindPathToEndPoint(aNavPoint, 1000).first;
+		// SpecialHandling may request a route to a lift trigger or marker.
+		// Suppress recursive script handling, but still find that route.
+		if (IsInPathSpecialHandling)
+			return SetRouteCache(path);
+		return PathSpecialHandling(path);
 	}
 	else if (auto actor = UObject::TryCast<UActor>(anActor))
 	{
