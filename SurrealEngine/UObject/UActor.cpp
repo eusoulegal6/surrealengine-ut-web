@@ -1245,8 +1245,10 @@ CollisionHit UActor::TryMove(const vec3& delta, bool dryRun, bool isOwnBaseBlock
 		return hit;
 	}
 
-	// Avoid moving if movement is too small as the physics code doesn't like very small numbers
-	if (dot(delta, delta) < 0.0001f)
+	// Avoid moving only when the delta is effectively zero. Slower bots can
+	// legitimately produce sub-threshold steps while accelerating or sliding
+	// along a wall; dropping those steps leaves them stationary and stuck.
+	if (dot(delta, delta) < 0.00000001f)
 		return {};
 
 	// Analyze what we will hit if we move as requested and stop if it is the level or a blocking actor
